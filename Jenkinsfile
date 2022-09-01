@@ -27,47 +27,15 @@ pipeline {
                 dockerPush("${IMAGE_NAME}")
             }
         }
-        stage('provision-server') {
-            // provisions the tf server
-            environment {
-                AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key_id')
-                AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
-                TF_VAR_env_prefix = 'test'
-            }
-            steps {
-                script {
-                    dir('terraform') {
-                        sh "terraform init"
-                        sh "terraform apply --auto-approve"
-                        EC2_PUBLIC_IP = sh(
-                            script: "terraform output ec2_public_ip",
-                            returnStdout: true
-                        ).trim()
-                    }
-                }
-            }
-        }
         stage("deploy") {
             steps {
                 script {
-                    echo "waiting for ec2 to init"
-                    sleep(time: 90, unit: "SECONDS")
-                    echo "${EC2_PUBLIC_IP}"
-
-                    def ec2Instance = "ec2-user@${EC2_PUBLIC_IP}"
-                    def shellCMD = "bash ./server-cmds.sh ${IMAGE_NAME}"
-
-                    sshagent(['server-ssh-key']) {
-                        sh "scp -o StrictHostKeyChecking=no server-cmds.sh ec2-user@${EC2_PUBLIC_IP}:/home/ec2-user"
-                        sh "scp -o StrictHostKeyChecking=no docker-compose.yaml ec2-user@${EC2_PUBLIC_IP}:/home/ec2-user"
-                        sh "ssh -o StrictHostKeyChecking=no ec2-user@${EC2_PUBLIC_IP} ${shellCMD}"
+                    echo 'deploying docker image kubectl'
+                    withKubeConfig([credentialsId: 'lke-credentials', serverUrl: 'https://e73c775e-7435-4569-a439-4aec343ad057.us-west-1.linodelke.net']) {
+                        sh 'kubectl create deployment nginx-deployment --image=nginx'
                     }
+
                 }
-            }
-        }
-        stage("commit version change") {
-            steps {
-                commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
             }
         }
     }

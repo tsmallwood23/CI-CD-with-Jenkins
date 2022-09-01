@@ -48,6 +48,9 @@ pipeline {
             }
         }
         stage("deploy") {
+            environment {
+                DOCKER_CREDS = credentials('dockerhub')
+            }
             steps {
                 script {
                     echo "waiting for ec2 to init"
@@ -55,7 +58,7 @@ pipeline {
                     echo "${EC2_PUBLIC_IP}"
 
                     def ec2Instance = "ec2-user@${EC2_PUBLIC_IP}"
-                    def shellCMD = "bash ./server-cmds.sh ${IMAGE_NAME}"
+                    def shellCMD = "bash ./server-cmds.sh ${IMAGE_NAME} ${DOCKER_CREDS_USR} ${DOCKER_CREDS_PSW}"
 
                     sshagent(['server-ssh-key']) {
                         sh "scp -o StrictHostKeyChecking=no server-cmds.sh ec2-user@${EC2_PUBLIC_IP}:/home/ec2-user"

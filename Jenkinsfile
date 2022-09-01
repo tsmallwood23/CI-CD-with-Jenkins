@@ -7,6 +7,10 @@ pipeline {
     tools {
         nodejs "my-nodejs"
     }
+    environment {
+        DOCKER_REPO_SERVER = '941523122081.dkr.ecr.us-west-1.amazonaws.com'
+        DOCKER_REPO = '${DOCKER_REPO_SERVER}/react-nodejs'
+    }
     stages {
         stage('increment version') {
             steps {
@@ -15,60 +19,45 @@ pipeline {
                         sh 'npm version minor'
                         def packageJson = readJSON file: 'package.json'
                         def version = packageJson.version
-                        env.IMAGE_NAME = "tsmallwood23/my-repo:njse-$version-$BUILD_NUMBER"
+                        env.IMAGE_NAME = "941523122081.dkr.ecr.us-west-1.amazonaws.com/react-nodejs:$version-$BUILD_NUMBER"
                     }
                 }
             }
         }
         stage('Build and Push docker image') {
             steps {
-                buildImage("${IMAGE_NAME}")
-                dockerLogin()
-                dockerPush("${IMAGE_NAME}")
-            }
-        }
-        stage('provision-server') {
-            // provisions the tf server
-            environment {
-                AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key_id')
-                AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
-                TF_VAR_env_prefix = 'test'
-            }
-            steps {
                 script {
-                    dir('terraform') {
-                        sh "terraform init"
-                        sh "terraform apply --auto-approve"
-                        EC2_PUBLIC_IP = sh(
-                            script: "terraform output ec2_public_ip",
-                            returnStdout: true
-                        ).trim()
+                    echo "building then pushing image"
+                    withCredentials([usernamePassword(credentialsId: 'ecr-credentials', passwordVariable: 'PASS', usernameVariable: 'USER')]) {
+                        sh "docker build -t ${IMAGE_NAME} ."
+                        sh "echo $PASS | docker login -u $USER --password-stdin ${DOCKER_REPO_SERVER}"
+                        sh "docker push ${IMAGE_NAME}"
                     }
                 }
+               // buildImage("${IMAGE_NAME}")
+                //dockerLogin()
+               // dockerPush("${IMAGE_NAME}")
             }
         }
         stage("deploy") {
+            environment {
+                AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
+                APP_NAME = 'react-nodejs'
+            }
             steps {
                 script {
-                    echo "waiting for ec2 to init"
-                    sleep(time: 90, unit: "SECONDS")
-                    echo "${EC2_PUBLIC_IP}"
+                    echo 'deploying docker image kubectl'
+                    sh 'envsubst < kubernetes/deployment.yaml | kubectl apply -f -'
+                    sh 'envsubst < kubernetes/service.yaml | kubectl apply -f -'
 
-                    def ec2Instance = "ec2-user@${EC2_PUBLIC_IP}"
-                    def shellCMD = "bash ./server-cmds.sh ${IMAGE_NAME}"
-
-                    sshagent(['server-ssh-key']) {
-                        sh "scp -o StrictHostKeyChecking=no server-cmds.sh ec2-user@${EC2_PUBLIC_IP}:/home/ec2-user"
-                        sh "scp -o StrictHostKeyChecking=no docker-compose.yaml ec2-user@${EC2_PUBLIC_IP}:/home/ec2-user"
-                        sh "ssh -o StrictHostKeyChecking=no ec2-user@${EC2_PUBLIC_IP} ${shellCMD}"
-                    }
                 }
             }
         }
-        stage("commit version change") {
-            steps {
-                commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
-            }
-        }
+        //stage("commit version change") {
+            //steps {
+                //commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
+            //}
+        //}
     }
 }

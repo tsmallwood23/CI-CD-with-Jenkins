@@ -1,26 +1,5 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
-# local .terraform dir
-
-.terraform/*
-
-
-# tf state files
-
-*.tfstate
-
-*.tfstate.*
-
-
-# variables files, may have sens info
-
-*.tfvars
-
-
-#crashlogs
-
-crash.log
-
 # compiled output
 /dist
 /my-app/build

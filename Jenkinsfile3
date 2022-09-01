@@ -1,0 +1,62 @@
+#!/usr/bin/env groovy
+@Library('jenkins-shared-library')
+def gv
+
+pipeline {
+    agent any
+    tools {
+        nodejs "my-nodejs"
+    }
+    stages {
+        stage('increment version') {
+            steps {
+                script {
+                    dir("my-app") {
+                        sh 'npm version minor'
+                        def packageJson = readJSON file: 'package.json'
+                        def version = packageJson.version
+                        env.IMAGE_NAME = "tsmallwood23/my-repo:njse-$version-$BUILD_NUMBER"
+                    }
+                }
+            }
+        }
+        stage('Build and Push docker image') {
+            steps {
+                buildImage("${IMAGE_NAME}")
+                dockerLogin()
+                dockerPush("${IMAGE_NAME}")
+            }
+        }
+        stage("deploy") {
+            environment {
+                AWS_ACCESS_KEY_ID = credentials('jenkins_aws_access_key_id')
+                AWS_SECRET_ACCESS_KEY = credentials('jenkins_aws_secret_access_key')
+            }
+            steps {
+                script {
+                    echo 'deploying docker image kubectl'
+                    sh 'kubectl create deployment nginx-deployment --image=nginx'
+                //script {
+                    //deployToEC2("docker run -d -p 3000:3080 tsmallwood23/my-repo:njse-${IMAGE_NAME}")
+                    //def dockerComposeCMD = "docker-compose -f docker-compose.yaml up --detach"
+                    //def shellCMD = "bash ./server-cmds.sh ${IMAGE_NAME}"
+
+                    //sshagent(['ec2-server-key']) {
+                        //sh "scp server-cmds.sh ec2-user@54.176.175.186:/home/ec2-user"
+                        //sh "scp docker-compose.yaml ec2-user@54.176.175.186:/home/ec2-user"
+                        //sh "ssh -o StrictHostKeyChecking=no ec2-user@54.176.175.186 ${shellCMD}"
+                    //}
+                    //def dockerCmd = 'docker run -d -p 3000:3080 tsmallwood23/my-repo:latest'
+                    //sshagent(['ec2-server-key']) {
+                        //sh "ssh -o StrictHostKeyChecking=no ec2-user@54.176.175.186 ${dockerCmd}"
+                    //}
+                }
+            }
+        }
+        stage("commit version change") {
+            steps {
+                commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
+            }
+        }
+    }
+}

@@ -1,0 +1,35 @@
+- name: Install Docker and docker python module
+  hosts: all
+  become: yes
+  become_user: root
+  tasks:
+    - name: Install Docker
+      yum:
+        name: docker
+        update_cache: yes
+        state: present
+    - name: install docker python module
+      pip:
+        name:
+          - docker
+          - docker-compose
+
+- name: Install Docker-compose
+  hosts: all
+  become: yes
+  tasks:
+    - name: download docker-compose binary
+      get_url:
+        url: https://github.com/docker/compose/releases/download/1.27.4/docker-compose-Linux-{{lookup('pipe', 'uname -m')}}
+        dest: /usr/local/bin/docker-compose
+        mode: +x
+- name: Start docker
+  hosts: docker_server_aws
+  become: yes
+  become_user: root
+  tasks:
+    - name: Start docker daemon
+      systemd:
+        name: docker
+        enabled: yes
+        state: started

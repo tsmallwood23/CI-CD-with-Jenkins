@@ -53,7 +53,7 @@ pipeline {
         }
         stage("commit version change") {
             steps {
-                commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
+                commitVersionChange("git@github.com:tsmallwood23/CI-CD-with-jenkins.git")
             }
         }
     }

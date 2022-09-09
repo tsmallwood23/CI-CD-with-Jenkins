@@ -51,10 +51,10 @@ pipeline {
                 }
             }
         }
-        //stage("commit version change") {
-            //steps {
-                //commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
-            //}
-        //}
+        stage("commit version change") {
+            steps {
+                commitVersionChange("gitlab.com/tsmallwood/react-nodejs-example.git")
+            }
+        }
     }
 }

@@ -34,9 +34,6 @@ pipeline {
                         sh "docker push ${IMAGE_NAME}"
                     }
                 }
-               // buildImage("${IMAGE_NAME}")
-                //dockerLogin()
-               // dockerPush("${IMAGE_NAME}")
             }
         }
         stage("deploy") {
